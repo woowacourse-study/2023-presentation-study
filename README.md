@@ -1,4 +1,4 @@
-# 백엔드 발표 스터디(테코톡 체험판)
+# 백엔드 발표 스터디
 
 ## 구성원(3/28 기준 12명)
 |  1팀  | <img src="https://avatars.githubusercontent.com/u/79046106?v=4" alt="" width=200> | <img src="https://avatars.githubusercontent.com/u/81925468?v=4" alt="" width=200> | <img src="https://avatars.githubusercontent.com/u/90550065?v=4" alt="" width=200> | <img src="https://avatars.githubusercontent.com/u/65850682?v=4" alt="" width=200> | <img src="https://avatars.githubusercontent.com/u/71129059?v=4" alt="" width=200> | <img src="https://avatars.githubusercontent.com/u/70891072?v=4" alt="" width=200> |
