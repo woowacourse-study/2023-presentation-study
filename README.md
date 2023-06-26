@@ -1,11 +1,17 @@
 # 백엔드 발표 스터디
 
-## 구성원(3/28 기준 12명)
+## 구성원
+### 레벨 1~2 - 12명
 |  1팀  | <img src="https://avatars.githubusercontent.com/u/79046106?v=4" alt="" width=200> | <img src="https://avatars.githubusercontent.com/u/81925468?v=4" alt="" width=200> | <img src="https://avatars.githubusercontent.com/u/90550065?v=4" alt="" width=200> | <img src="https://avatars.githubusercontent.com/u/65850682?v=4" alt="" width=200> | <img src="https://avatars.githubusercontent.com/u/71129059?v=4" alt="" width=200> | <img src="https://avatars.githubusercontent.com/u/70891072?v=4" alt="" width=200> |
 | :---: | :-------------------------------------------------------------------------------: | :-------------------------------------------------------------------------------: | :-------------------------------------------------------------------------------: | :-------------------------------------------------------------------------------: | :-------------------------------------------------------------------------------: | :-------------------------------------------------------------------------------: |
 |  | **[로건](https://github.com/70825)** | [메리](https://github.com/swonny) | [로이스](https://github.com/TaeyeonRoyce) | [홍고](https://github.com/hgo641) | [애쉬](https://github.com/xxeol2) | [바론](https://github.com/somsom13) |
 | 2팀 | <img src="https://avatars.githubusercontent.com/u/81465068?v=4" alt="" width=200> | <img src="https://avatars.githubusercontent.com/u/63184334?v=4" alt="" width=200> | <img src="https://avatars.githubusercontent.com/u/88660886?v=4" alt="" width=200> | <img src="https://avatars.githubusercontent.com/u/96688810?v=4" alt="" width=200> | <img src="https://avatars.githubusercontent.com/u/95729738?v=4" alt="" width=200> | <img src="https://avatars.githubusercontent.com/u/103317169?v=4" alt="" width=200> |
 |  | **[아마란스](https://github.com/amaran-th)** | [제이미](https://github.com/JJ503) | [조이](https://github.com/yeonkkk) | [엔초](https://github.com/kwonyj1022) | [성하](https://github.com/sh111-coder) | [케로](https://github.com/jyeost) |
+
+### 레벨 3
+|  선잠팀 (선릉->잠실)  | <img src="https://avatars.githubusercontent.com/u/81925468?v=4" alt="" width=200> | <img src="https://avatars.githubusercontent.com/u/65850682?v=4" alt="" width=200> | <img src="https://avatars.githubusercontent.com/u/63184334?v=4" alt="" width=200> | <img src="https://avatars.githubusercontent.com/u/96688810?v=4" alt="" width=200> | <img src="https://avatars.githubusercontent.com/u/61582017?v=4" alt="" width=200> |
+| :---: | :-------------------------------------------------------------------------------: | :-------------------------------------------------------------------------------: | :-------------------------------------------------------------------------------: | :-------------------------------------------------------------------------------: |  :-------------------------------------------------------------------------------: | 
+| |  [메리](https://github.com/swonny) | [홍고](https://github.com/hgo641) | [제이미](https://github.com/JJ503) | [엔초](https://github.com/kwonyj1022) | [로지](https://github.com/kyY00n) |
 
 ### 발표 방식
 
