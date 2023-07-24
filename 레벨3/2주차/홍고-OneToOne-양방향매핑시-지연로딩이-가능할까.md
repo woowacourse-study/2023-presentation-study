@@ -1,4 +1,7 @@
 # OneToOne 양방향매핑시 지연로딩이 가능할까?
+
+[블로그링크](https://velog.io/@hgo641/OneToOne-%EC%96%91%EB%B0%A9%ED%96%A5-%EB%A7%A4%ED%95%91%EC%8B%9C-%EC%A7%80%EC%97%B0%EB%A1%9C%EB%94%A9%EC%9D%B4-%EA%B0%80%EB%8A%A5%ED%95%A0%EA%B9%8C)
+
 ## TargetEntity에서 지연로딩 불가능
 결론만 먼저 말하자면 `SourceEntity`를 조회할 때는 지연로딩이 가능하지만, `TargetEntity`를 조회할 때는 지연로딩이 불가능하다.
 
