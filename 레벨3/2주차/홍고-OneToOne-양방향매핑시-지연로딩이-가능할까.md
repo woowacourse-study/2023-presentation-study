@@ -119,11 +119,6 @@ Hibernate:
 
 이는 `@OneToOne(optional = false)`, `@JoinColumn(nullable = false)`로 설정해도 무조건 즉시 로딩으로 수행된다. 지연 로딩으로 불러오고 싶다면, 단방향 매핑으로 바꾸거나 `@OneToMany`, `@ManyToOne`으로 매핑해주어야 한다.
 
-> `@OneToMany`는 왜 지연로딩이 가능할까?
-
-> `@OneToMany`일 때 외래키 관리자가 `Many`측이라면, `@OneToOne`과 마찬가지로 `One`인 DB Entity 쪽에서 연관 객체의 존재여부를 알 수 없다. 그러나 `@OneToOne`과 달리 `@OneToMany`의 `One`객체는 `Many`를 참조하는 필드를 컬렉션으로 관리한다.
-
-> 때문에 연관 객체를 null 또는 프록시로 할당하지 않고, 무조건 프록시 객체(컬렉션)을 만든 후 만약 연관된 객체가 없다면 빈 컬렉션을, 연관된 객체가 있다면 실제 DB에서 조회해 온 객체를 사용한다고 한다.
 
 ### 즉시 로딩이 나빠?
 그냥 즉시 로딩하면 안되는 건가? 즉시 로딩을 하면 어떤 단점이 있을까?
