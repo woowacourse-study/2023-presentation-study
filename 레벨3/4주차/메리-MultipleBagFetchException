@@ -1,0 +1,438 @@
+## 문제 상황
+
+### 경매 엔티티
+
+```java
+// 생성자 및 일부 필드 생략
+
+@Entity
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Getter
+@ToString(of = {"id", "title", "description", "bidUnit", "startPrice", "deleted", "closingTime"})
+public class Auction extends BaseTimeEntity {
+
+    private static final boolean DELETED_STATUS = true;
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "seller_id", foreignKey = @ForeignKey(name = "fk_auction_seller"))
+    private User seller;
+
+    @Column(length = 30)
+    private String title;
+
+    @Column(columnDefinition = "text")
+    private String description;
+
+    @OneToMany(mappedBy = "auction", cascade = {CascadeType.PERSIST, CascadeType.REMOVE})
+    private List<AuctionRegion> auctionRegions = new ArrayList<>();
+
+    @OneToMany(mappedBy = "auction", cascade = {CascadeType.PERSIST, CascadeType.REMOVE})
+    private List<AuctionImage> auctionImages = new ArrayList<>();
+
+    private int auctioneerCount = 0;
+
+}
+```
+
+### 경매 지역 엔티티
+
+```java
+// 생성자 및 일부 필드 생략
+
+@Entity
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Getter
+@ToString(exclude = {"auction", "thirdRegion"})
+public class AuctionRegion {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "auction_id", foreignKey = @ForeignKey(name = "fk_auction_region_auction"))
+    private Auction auction;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "third_region_id", foreignKey = @ForeignKey(name = "fk_auction_region_third_region"))
+    private Region thirdRegion;
+}
+```
+
+### 경매 이미지
+
+```java
+// 생성자 및 일부 필드 생략
+
+@Entity
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Getter
+@ToString(of = {"id", "uploadName", "storeName", "authenticated"})
+public class AuctionImage {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String uploadName;
+
+    private String storeName;
+
+    private boolean authenticated = false;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "auction_id", foreignKey = @ForeignKey(name = "fk_auction_image"))
+    private Auction auction;
+}
+```
+
+위와 같이 경매 엔티티와 경매 엔티티에 속한 엔티티들이 있을 때, 경매와 `@OneToMany` 관계에 해당하는 두 개의 엔티티 `AuctionRegion` 과 `AuctionImage` 가 있습니다. 경매 엔티티를 조회할 때 `@OneToMany` 관계에 있는 엔티티들의 fetch type을 Lazy 또는 Eager로 지정해둔다면 경매 엔티티를 조회할 때마다 N+1 문제가 발생합니다.
+
+### N+1이란?
+
+N+1 문제란, 특정 부모 엔티티 한 개를 조회하기 위한 하나의 쿼리를 날렸을 때 연관관계에 있는 엔티티를 함께 조회하기 위해 의도하지 않은 쿼리가 추가적으로 발생하는 문제입니다.
+
+앞서 언급한 것처럼 해당 문제는 fetch type이 Lazy 또는 Eager로 지정되어 있을 때 발생하게 됩니다. 위의 경매 엔티티 조회 예시를 조금 바꾸어 설명해보겠습니다.
+
+```java
+// 생성자 및 일부 필드 생략
+
+@Entity
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Getter
+@ToString(of = {"id", "title", "description", "bidUnit", "startPrice", "deleted", "closingTime"})
+public class Auction extends BaseTimeEntity {
+
+    private static final boolean DELETED_STATUS = true;
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "seller_id", foreignKey = @ForeignKey(name = "fk_auction_seller"))
+    private User seller;
+}
+```
+
+경매 엔티티 중 하나의 하위 엔티티 `User` 만을 남겨두고, 해당 하위 엔티티의 fetch type을 Eager로 지정해두었을 때 `findById()` 메서드를 수행한 뒤 쿼리를 확인하면 inner join문 하나만 날라간 것을 볼 수 있습니다. `findById()`와 같은 경우에는 entity manager로부터 관리되기 때문에 jpa 내부적으로 join 쿼리를 실행시키기 때문에 N+1 문제가 발생하지 않습니다.
+
+하지만 entity manager의 관리 대상이 아닌 직접 짠 메서드들은 상황이 다릅니다. `Auction(경매)` 엔티티를 조회하기 위해 가장 먼저 fetch type이 Eager인 경우에는 직접 짠 JPQL이 SQL문으로 번역이 됩니다. 모든 경매글을 조회하는 `findAll()`의 경우 SQL문으로 번역되는 과정에서 모든 Auction 엔티티를 조회하게 되고, 조회한 모든 `Auction` 엔티티에 대한 `User` 엔티티를 조회하는 쿼리가 추가적으로 발생하게 됩니다.
+
+즉, N+1 문제가 발생하게 됩니다. 이는 사용되지 않는 엔티티를 자주 로딩하므로 성능에 악영향을 미치게 됩니다.
+
+다음으로 fetch type이 Lazy로 지정된 경우에는 상위 엔티티인 Auction(경매) 엔티티를 조회할 때 한 번에 하위 엔티티를 가져오지 않고, `getter()` 등을 사용했을 때와 같이 실제로 하위 엔티티가 필요한 시점에 해당 엔티티를 가져오기 때문에 N+1 문제가 발생합니다.
+
+**요약**
+
+> `FetchType.EAGER` : 즉시 로딩
+1. JPQL에서 만든 SQL을 통해 데이터 조회
+2. 이후 JPA에서 Fetch 전략을 가지고 해당 데이터의 연관 관계인 하위 엔티티들을 추가 조회
+3. 2번으로 인한 N+1 문제 발생
+>
+
+> `FetchType.LAZY` : 지연 로딩
+1. JPQL에서 만든 SQL을 통해 데이터를 조회
+2. JPA에서 Fetch 전략을 가지지만, 지연 로딩이기 때문에 추가 조회는 하지 않음
+3. 하지만, 하위 엔티티를 가지고 작업하게 되면 추가 조회가 발생하기 때문에 결국 N + 1 문제 발생
+>
+
+즉, N+1 문제란 상위 엔티티를 조회하는 한 번의 쿼리를 위해 하위 엔티티를 조회하기 위한 N번의 쿼리가 추가적으로 발생하는 것을 의미합니다.
+
+## N+1 해결 방안
+
+### fetch join
+
+fetch join이란 SQL에서 사용하는 join문 중 하나가 아닌, JPQL에서 성능 최적화를 위해 제공하는 기능입니다. 위의 예시처럼 하나의 엔티티가 연관 관계를 갖는 하위 엔티티들을 가질 때 하위 엔티티를 조회하기 위해 추가적인 쿼리를 날리는 대신 엔티티 조회에 필요한 테이블을 join하여 한 번의 쿼리만으로 하위 엔티티까지 모두 조회해올 수 있는 기능입니다.
+
+다음과 같이 JPQL을 직접 작성하여 fetch join을 걸어줄 수 있습니다.
+
+```java
+@Query("select distinct a from Auction a left join fetch a.user")
+User findAll();
+```
+
+여기서 `distinct` 를 사용해준 이유는 fetch join을 사용했을 때의 문제점 때문인데요, 이 부분은 추후에 설명하겠습니다.
+
+위의 예시 코드에서 작성한 것처럼 JPQL로 직접 SQL문을 하드코딩하여 `left join fetch` 를 작성해주면 fetch join이 가능해집니다. 이처럼 작성한 코드를 실행시켜보면 User를 조회하기 위한 추가 쿼리가 나가지 않고, 한 번의 쿼리만으로 Auction을 조회해오는 것을 확인할 수 있습니다.
+
+하지만 위와 같이 fetch join을 위한 JPQL을 작성하는 것에는 불편한 점이 하나 있습니다. SQL문을 직접 하드코딩 해주어야 한다는 점입니다. 만약 querydsl과 같은 프레임워크를 사용한다면, 다음과 같이 가독성 좋고 실수도 최소화 할 수 있는 코드를 작성할 수 있을 것입니다.
+
+```java
+@Override
+public Slice<Auction> findAuctionsAllByLastAuctionId(final Long lastAuctionId, final int size) {
+    final List<Auction> auctions = queryFactory
+            .selectFrom(auction)
+            .leftJoin(auction.seller).fetchJoin()
+            .fetch();
+
+    return QuerydslSliceHelper.toSlice(auctions, size);
+}
+```
+
+`fetchJoin()`이라는 메서드를 호출하여 fetch join을 손쉽게 구현할 수 있습니다.
+
+하지만 queryDsl을 사용하지 않는 환경에서 구현해야 하는 상황도 많을 것입니다. 이때 fetch join을 조금 더 편리하게 사용할 수 있는 방법이 있습니다.
+
+### @NamedEntityGraphs
+
+```java
+@EntityGraph(attributePaths = {"user"})
+@Query("select DISTINCT a from Auction a")
+List<Auction> findAllEntityGraph();
+```
+
+`@EntityGraphs` 어노테이션을 추가하는 방식이 있습니다.  `attributePaths` 옵션에 fetch join 시 한 번에 조회하고자 하는 엔티티 명을 작성해주면 fetch join을 해오는 방식입니다. 이때 여러 개의 엔티티를 추가해줄 수 있고, JPQL로 모든 부분을 하드코딩 했을 때보다는 가독성 측면에서도 우수하고 하드코딩된 문자열로 인해 발생하는 문제를 줄여주어 디버깅 측면에서도 더 편리한 방법이 될 수 있습니다.
+
+이때 JPQL로 작성한 fetch join과 `@EntityGraphs` 를 사용한 fetch join의 차이점은 fetch join은 inner join이 발생하고, `@EntityGraphs` 는 outer join이 발생한다는 점에 있습니다. 일반적으로는 inner join이 outer join보다 성능 최적화에 더 유리하기 때문에, 개인의 상황에 맞게 사용하면 될 것 같습니다.
+
+## fetch join을 사용했을 때의 문제점 - 30분
+
+### 문제점 1. 카테시안 곱
+
+JPQL로 작성한 fetch join과 `@EntityGraphs` 모두 fetch join을 수행하는 쿼리입니다. 그리고 fetch join을 사용할 때는 카테시안 곱으로 인해 중복되는 레코드가 조회되는 문제가 발생할 수 있습니다.
+
+카테시안 곱이란 두 테이블 사이에 유효 join 조건을 적지 않았을 때 해당 테이블에 대해 발생할 수 있는 모든 경우의 수 데이터를 전부 결합하여 테이블에 존재하는 행 갯수를 곱한만큼의 결과 값이 반환되는 것을 의미합니다. 즉, 테이블 join이 발생하는 경우에 적절하지 못한 where절을 걸거나, where절이 생략되었을 때 중복되는 데이터가 여러 행으로 생성되는 문제를 의미합니다.
+
+![출처: [https://velog.io/@mohai2618/JPA에서-fetchJoin을-사용할-때-주의해야할-점](https://velog.io/@mohai2618/JPA%EC%97%90%EC%84%9C-fetchJoin%EC%9D%84-%EC%82%AC%EC%9A%A9%ED%95%A0-%EB%95%8C-%EC%A3%BC%EC%9D%98%ED%95%B4%EC%95%BC%ED%95%A0-%EC%A0%90)](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/6cbada13-51fe-4be1-b182-8fc0b9fddcdc/Untitled.png)
+
+출처: [https://velog.io/@mohai2618/JPA에서-fetchJoin을-사용할-때-주의해야할-점](https://velog.io/@mohai2618/JPA%EC%97%90%EC%84%9C-fetchJoin%EC%9D%84-%EC%82%AC%EC%9A%A9%ED%95%A0-%EB%95%8C-%EC%A3%BC%EC%9D%98%ED%95%B4%EC%95%BC%ED%95%A0-%EC%A0%90)
+
+예를 들어 Team 엔티티를 조회하는데 하위 엔티티인 Member를 함께 조회해야 한다고 가정했을 때, fetch join을 통해 테이블을 조회하면 첫 번째 그림과 같이 회원의 개수만큼 행이 늘어나게 됩니다. 이러한 행의 중복은 SQL의 `distinct`를 사용하여 제거하게 됩니다.
+
+이렇게 중복을 해결하기 위해 `distinct` 를 사용해주는 것인데요, 위의 경우 team의 id가 중복되더라도 회원 데이터가 다르기 때문에 중복된 행으로 간주하지 않아 행이 제거되지 않습니다. jpql에 작성되는 `distinct` 는 sql에서 작성되는 `distinct`와는 조금 다르게 동작합니다. sql은 앞서 언급한 것과 같이 행을 기준으로 중복을 제거하게 됩니다.
+
+하지만 이 상태로 Team을 조회하게 된다면 동일한 id 1을 갖는 팀A가 여러 개의 객체로 조회될 것입니다. 즉, 팀 목록을 조회하는 데 적절하지 않은 결과를 반환하는 것입니다. 이때 JPQL의 distinct를 사용하여 객체를 기준으로 중복되는 객체를 제거할 수 있습니다.
+
+sql문에서의 distinct와 jpql에서의 distinct는 조금 다른 역할을 합니다.
+
+- sql의 distinct: 동일한 행을 기준으로 중복 제거(레코드의 모든 컬럼이 동일한 경우에만 적용)
+- jpql의 distinct: 동일한 객체를 기준으로 중복 제거(객체의 식별자를 기준으로 중복 제거)
+
+### 문제점 2. `MultipleBagFetchException`
+
+JPA에서는 `@..ToMany` 연관 관계를 맺는 한 개 이상의 하위 객체를 fetch join 할 수 없도록 막아두고 있습니다. 이렇게 다중 `@OneToMany` 엔티티를 동시에 fetch join 한 경우에 발생하는 예외가 `Multple-Bag-Fetch-Exeption` 입니다.
+
+JPA에서 필드에 사용되는 List는 Bag이라는 자료구조로 저장되는데, Bag은 Hibernate에서 컬렉션을 매핑할 때 사용하는 컬렉션입니다. 즉, `MultipleBagFetchException`은 두 개 이상의 Bag 컬렉션을 Fetch Join으로 가져오려고 할 때 발생합니다. Hibernate에서는 Fetch Join으로 연관된 엔티티의 컬렉션을 가져올 때 N+1 쿼리 문제를 해결하기 위해 내부적으로 한 번에 한 개의 fetch join만 가능하도록 막아두었고, 따라서 `List` 자료구조를 갖는 `@OneToMany` 엔티티를 두 개 이상 fetch join하는 경우 이와 같은 예외가 발생하게 됩니다.
+
+## 땅땅땅이 겪은 문제
+
+처음 소개해드린 Auction 엔티티를 보면 알 수 있듯이 `@OneToMany` 에 해당하는 필드를 두 개 가지고 있습니다. (`List<AuctionImage> images`, `List<AuctionRegion> regions`) 따라서 경매 엔티티 조회 시 이미지 또는 지역 개수만큼의 쿼리가 추가적으로 발생하게 됩니다. 즉, N+1 문제가 발생하는 것을 해결하기 위해 fetch join을 사용하게 되었습니다.
+
+그런데 앞서 설명했듯 fetch join은 최대 한 개의 `@OneToMany` 관계의 하위 엔티티에만 적용이 가능하기 때문에 두 개 이상 사용할 경우 `MultipleBagFetchException` 이 발생하게 됩니다.
+
+### 문제 상황
+
+- 경매글 조회 시 N+1 문제 발생
+    - `@OneToOne` 관계에 있는 필드는 fetch join이 가능하다.
+    - `@OneToMany` 관계에 있는 필드는 fetch join을 하면 카테시안 곱 문제가 발생한다. 이때 리스트가 하나 뿐이라면 jpa가 `distinct` 를 통해 중복되는 레코드를 제거해주지만, 하나의 필드 이상 `@OneToMany` 관계를 갖는 필드를 레코드 수가 급격히 증가하기 때문에 fetch join 할 수 없다.
+      (= `MultipleBagFetchException`)
+
+### 우리팀의 해결 방법
+
+1. 추가적인 쿼리가 더 많이 나가는 필드를 fetch join으로 조회하기
+2. `default_batch_fetch_size` 지정
+    - default_batch_fetch_size란? 지정해준 사이즈만큼 in절로 데이터를 한번에 조회하게 됩니다. 따라서 조회해야 할 이미지가 10개인 경우에도 in절로 인해 한 번에 조회가 가능하게 됩니다.
+        - 주의할 점:  in절 파라미터로 1,000 이상의 값을 넣으면 문제가 발생할 수 있으니 주의해야 한다.
+        - 같은 방법으로 **Fetch 적용시 발생하는 페이징 문제도 동일하게 해결됩니다.** 1:N 관계에서의 페이징 문제는 Join으로 인해 1에 대한 페이징이 정상작동 하지 않기 때문입니다.
+
+1. 연관 관계로 인해 쿼리가 세 번 나가는 `region` 조회 쿼리를 fetch join으로 처리하고, 쿼리가 한 번만 더 나가는 `image` 조회 쿼리를 추가적으로 날리도록 했습니다.
+    - 쿼리
+        - 지역을 fetch join한 경우
+
+        ```java
+        Hibernate:
+            /* select
+                auction
+            from
+                Auction auction
+            left join
+                fetch auction.auctionRegions as auctionRegion
+            left join
+                fetch auctionRegion.thirdRegion as region
+            left join
+                fetch region.firstRegion
+            left join
+                fetch region.secondRegion
+            left join
+                fetch auction.subCategory as category
+            left join
+                fetch category.mainCategory
+            left join
+                fetch auction.seller
+            where
+                auction.deleted = ?1
+            order by
+                auction.id desc */ select
+                    a1_0.id,
+                    a2_0.auction_id,
+                    a2_0.id,
+                    t1_0.id,
+                    f1_0.id,
+                    f1_0.first_region_id,
+                    f1_0.name,
+                    f1_0.second_region_id,
+                    t1_0.name,
+                    s1_0.id,
+                    s1_0.first_region_id,
+                    s1_0.name,
+                    s1_0.second_region_id,
+                    a1_0.bid_unit,
+                    a1_0.closing_time,
+                    a1_0.created_time,
+                    a1_0.is_deleted,
+                    a1_0.description,
+                    a1_0.last_bid_id,
+                    a1_0.last_modified_time,
+                    s3_0.id,
+                    s3_0.name,
+                    s3_0.profile_image,
+                    s3_0.reliability,
+                    a1_0.start_price,
+                    s2_0.id,
+                    m1_0.id,
+                    m1_0.main_category_id,
+                    m1_0.name,
+                    s2_0.name,
+                    a1_0.title
+                from
+                    auction a1_0
+                left join
+                    auction_region a2_0
+                        on a1_0.id=a2_0.auction_id
+                left join
+                    region t1_0
+                        on t1_0.id=a2_0.third_region_id
+                left join
+                    region f1_0
+                        on f1_0.id=t1_0.first_region_id
+                left join
+                    region s1_0
+                        on s1_0.id=t1_0.second_region_id
+                left join
+                    categories s2_0
+                        on s2_0.id=a1_0.sub_category_id
+                left join
+                    categories m1_0
+                        on m1_0.id=s2_0.main_category_id
+                left join
+                    users s3_0
+                        on s3_0.id=a1_0.seller_id
+                where
+                    a1_0.is_deleted=?
+                order by
+                    a1_0.id desc
+        Hibernate:
+            select
+                a1_0.auction_id,
+                a1_0.id,
+                a1_0.authenticated,
+                a1_0.store_name,
+                a1_0.upload_name
+            from
+                auction_image a1_0
+            where
+                a1_0.auction_id=?
+        ```
+
+        - 이미지를 fetch join한 경우
+
+        ```java
+        Hibernate:
+            /* select
+                auction
+            from
+                Auction auction
+            left join
+                fetch auction.subCategory as category
+            left join
+                fetch category.mainCategory
+            left join
+                fetch auction.seller
+            left join
+                fetch auction.auctionImages
+            where
+                auction.deleted = ?1
+            order by
+                auction.id desc */ select
+                    a1_0.id,
+                    a2_0.auction_id,
+                    a2_0.id,
+                    a2_0.authenticated,
+                    a2_0.store_name,
+                    a2_0.upload_name,
+                    a1_0.bid_unit,
+                    a1_0.closing_time,
+                    a1_0.created_time,
+                    a1_0.is_deleted,
+                    a1_0.description,
+                    a1_0.last_bid_id,
+                    a1_0.last_modified_time,
+                    s2_0.id,
+                    s2_0.name,
+                    s2_0.profile_image,
+                    s2_0.reliability,
+                    a1_0.start_price,
+                    s1_0.id,
+                    m1_0.id,
+                    m1_0.main_category_id,
+                    m1_0.name,
+                    s1_0.name,
+                    a1_0.title
+                from
+                    auction a1_0
+                left join
+                    categories s1_0
+                        on s1_0.id=a1_0.sub_category_id
+                left join
+                    categories m1_0
+                        on m1_0.id=s1_0.main_category_id
+                left join
+                    users s2_0
+                        on s2_0.id=a1_0.seller_id
+                left join
+                    auction_image a2_0
+                        on a1_0.id=a2_0.auction_id
+                where
+                    a1_0.is_deleted=?
+                order by
+                    a1_0.id desc
+        // AuctionRegion 조회 -> thirdRegionId 조회
+        Hibernate:
+            select
+                a1_0.auction_id,
+                a1_0.id,
+                a1_0.third_region_id
+            from
+                auction_region a1_0
+            where
+                a1_0.auction_id=?
+        // SecondRegion 조회
+        Hibernate:
+            select
+                r1_0.id,
+                r1_0.first_region_id,
+                r1_0.name,
+                r1_0.second_region_id
+            from
+                region r1_0
+            where
+                r1_0.id=?
+        // FirstRegion 조회
+        Hibernate:
+            select
+                r1_0.id,
+                r1_0.first_region_id,
+                r1_0.name,
+                r1_0.second_region_id
+            from
+                region r1_0
+            where
+                r1_0.id in(?,?)
+        ```
+
+2. 이미지를 조회할 때 각 아이디에 대한 쿼리를 하나씩 날려야 하기 때문에 10장의 이미지라면 열 번의 쿼리가 나가야 합니다. 이것을 개선하기 위해  `default_batch_fetch_size` 를 사용해 `in` 쿼리를 사용하도록 하였습니다.
